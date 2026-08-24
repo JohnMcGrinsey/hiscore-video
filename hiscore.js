@@ -9,8 +9,8 @@
 (function () {
   'use strict';
   if (window.__HISCORE_KIT) return;
-  /* Die Arcade hat ihr eigenes hiscore.js (Login, Ghost-Ton). Zwei Karten
-     auf play.mcgrinsey.com waeren der Fehler von Hypeout, nochmal. */
+  /* The arcade has its own hiscore.js (login, ghost audio). Two cards on
+     play.mcgrinsey.com would be the Hypeout mistake all over again. */
   if (location.hostname === 'play.mcgrinsey.com') return;
   window.__HISCORE_KIT = true;
 
@@ -25,14 +25,14 @@
     return (navigator.language || '').toLowerCase().indexOf('de') === 0;
   })();
 
-  function bootGs(dann) {
-    if (window.GS) { dann(); return; }
+  function bootGs(next) {
+    if (window.GS) { next(); return; }
     var s = document.createElement('script');
     s.src = BASE + '/gs.js';
     if (KEY) s.setAttribute('data-key', KEY);
     if (VER) s.setAttribute('data-version', VER);
     if (me && me.dataset && me.dataset.store) s.setAttribute('data-store', me.dataset.store);
-    s.onload = dann;
+    s.onload = next;
     (me && me.parentNode ? me.parentNode : document.head).appendChild(s);
   }
 
@@ -43,7 +43,7 @@
   /* ---- Recorder: canvas, optional camera, never auto-mic/cam -------------- */
   var rec = null, chunks = [], stream = null, lastBlob = null, lastUrl = null;
   var comp = null, ctx = null, raf = 0, camStream = null, camVideo = null;
-  var wantCam = false, recAn = false, usedComp = false, orb = null, menu = null, hostCard = null;
+  var wantCam = false, recOn = false, usedComp = false, orb = null, menu = null, hostCard = null;
   var wrapped = false, webaudioTaps = [], mixCtx = null, mixKeep = [], ticker = null;
 
   function canvas() {
@@ -77,15 +77,15 @@
   }
   tapWebAudio();
 
-  function sammleTon() {
-    var raus = [], seen = {};
+  function collectAudio() {
+    var out = [], seen = {};
     function add(s) {
       if (!s) return;
       try {
         s.getAudioTracks().forEach(function (t) {
           if (!t || !t.enabled || t.readyState === 'ended' || seen[t.id]) return;
           seen[t.id] = true;
-          raus.push(t);
+          out.push(t);
         });
       } catch (e) {}
     }
@@ -100,27 +100,27 @@
         }
       }
     } catch (e4) {}
-    return raus;
+    return out;
   }
 
-  function mixSpuren(spuren) {
+  function mixTracks(tracks) {
     mixKeep = [];
-    if (!spuren.length) return [];
-    if (spuren.length === 1) return spuren.slice();
+    if (!tracks.length) return [];
+    if (tracks.length === 1) return tracks.slice();
     var AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return spuren.slice(0, 1);
+    if (!AC) return tracks.slice(0, 1);
     try {
       if (!mixCtx) mixCtx = new AC();
       if (mixCtx.state === 'suspended') mixCtx.resume();
       var dest = mixCtx.createMediaStreamDestination();
       mixKeep.push(dest);
-      for (var i = 0; i < spuren.length; i++) {
-        var src = mixCtx.createMediaStreamSource(new MediaStream([spuren[i]]));
+      for (var i = 0; i < tracks.length; i++) {
+        var src = mixCtx.createMediaStreamSource(new MediaStream([tracks[i]]));
         src.connect(dest);
         mixKeep.push(src);
       }
       return dest.stream.getAudioTracks();
-    } catch (e) { return spuren.slice(0, 1); }
+    } catch (e) { return tracks.slice(0, 1); }
   }
 
   function boxTag(u, i) {
@@ -159,8 +159,8 @@
     }).catch(function () { cb(blob); });
   }
 
-  function mime(mitTon) {
-    var opts = mitTon
+  function mime(withAudio) {
+    var opts = withAudio
       ? ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp8,opus', 'video/webm']
       : ['video/mp4;codecs=avc1.42E01E', 'video/mp4', 'video/webm;codecs=vp8', 'video/webm'];
     if (!window.MediaRecorder) return '';
@@ -170,7 +170,7 @@
     return '';
   }
 
-  function bauComp(src) {
+  function buildComp(src) {
     if (!comp) { comp = document.createElement('canvas'); ctx = comp.getContext('2d'); }
     var w = src.width || src.clientWidth || 640;
     var h = src.height || src.clientHeight || 360;
@@ -183,7 +183,7 @@
     return comp;
   }
 
-  function zeichne() {
+  function draw() {
     if (!ctx || !comp) return;
     var src = canvas();
     var w = comp.width, h = comp.height;
@@ -210,14 +210,14 @@
     ctx.fillText('gamesareeatingtheworld.com', w - 10, h - 8);
   }
 
-  function schleife() {
-    zeichne();
-    if (rec && rec.state === 'recording') raf = requestAnimationFrame(schleife);
+  function loop() {
+    draw();
+    if (rec && rec.state === 'recording') raf = requestAnimationFrame(loop);
   }
 
-  function camAn(dann) {
-    if (camStream) { if (dann) dann(true); return; }
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { if (dann) dann(false); return; }
+  function camOn(next) {
+    if (camStream) { if (next) next(true); return; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { if (next) next(false); return; }
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 320 } }, audio: false })
       .then(function (s) {
         camStream = s;
@@ -231,9 +231,9 @@
         }
         camVideo.srcObject = s;
         camVideo.play().catch(function () {});
-        if (dann) dann(true);
+        if (next) next(true);
       })
-      .catch(function () { if (dann) dann(false); });
+      .catch(function () { if (next) next(false); });
   }
 
   function recStart() {
@@ -241,22 +241,22 @@
     lastBlob = null;
     if (lastUrl) { try { URL.revokeObjectURL(lastUrl); } catch (e) {} lastUrl = null; }
     var c = canvas();
-    if (!c || !window.MediaRecorder) { recAn = false; orbStand(); return false; }
-    var ton = mixSpuren(sammleTon());
-    var mitTon = ton.length > 0;
-    var type = mime(mitTon);
+    if (!c || !window.MediaRecorder) { recOn = false; orbState(); return false; }
+    var audio = mixTracks(collectAudio());
+    var withAudio = audio.length > 0;
+    var type = mime(withAudio);
     usedComp = !!(wantCam || !c.captureStream);
     try {
       var vis;
       if (usedComp) {
-        bauComp(c);
-        zeichne();
+        buildComp(c);
+        draw();
         vis = comp.captureStream(30);
       } else {
         vis = c.captureStream(30);
       }
       var tracks = vis.getVideoTracks().slice();
-      if (mitTon) tracks = tracks.concat(ton);
+      if (withAudio) tracks = tracks.concat(audio);
       stream = new MediaStream(tracks);
       rec = type ? new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 1400000 })
                  : new MediaRecorder(stream);
@@ -264,32 +264,32 @@
     chunks = [];
     rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) chunks.push(ev.data); };
     try { rec.start(1000); } catch (e2) { rec = null; return false; }
-    recAn = true;
-    if (usedComp) raf = requestAnimationFrame(schleife);
+    recOn = true;
+    if (usedComp) raf = requestAnimationFrame(loop);
     if (ticker) clearInterval(ticker);
     ticker = setInterval(function () {
       try { if (rec && rec.state === 'recording' && rec.requestData) rec.requestData(); } catch (e3) {}
     }, 1000);
-    orbStand();
+    orbState();
     return true;
   }
 
-  function recStop(quiet, dann) {
+  function recStop(quiet, next) {
     if (ticker) { clearInterval(ticker); ticker = null; }
-    var fertig = function () {
+    var finish = function () {
       if (raf) { cancelAnimationFrame(raf); raf = 0; }
-      /* ⚠️ captureStream auf dem Spiel-Canvas: Tracks nicht stoppen,
-         sonst friert das Spielbild in manchen Browsern ein. */
+      /* ⚠️ captureStream on the game canvas: do not stop those tracks,
+         or the game picture freezes in some browsers. */
       if (stream && usedComp) {
         try { stream.getVideoTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
       }
       stream = null;
-      var ende = function () {
+      var done = function () {
         chunks = [];
         rec = null;
-        recAn = false;
-        orbStand();
-        if (dann) { var f = dann; dann = null; f(); }
+        recOn = false;
+        orbState();
+        if (next) { var f = next; next = null; f(); }
       };
       if (!quiet) {
         packBlob(function (blob) {
@@ -298,28 +298,28 @@
           if (lastBlob) {
             try { lastUrl = URL.createObjectURL(lastBlob); } catch (e3) { lastUrl = null; }
           }
-          ende();
+          done();
         });
-      } else ende();
+      } else done();
     };
-    if (!rec || !rec.state || rec.state === 'inactive') { fertig(); return; }
+    if (!rec || !rec.state || rec.state === 'inactive') { finish(); return; }
     var r = rec;
-    var to = setTimeout(fertig, 900);
-    r.onstop = function () { clearTimeout(to); fertig(); };
-    try { if (r.requestData) r.requestData(); r.stop(); } catch (e) { clearTimeout(to); fertig(); }
+    var to = setTimeout(finish, 900);
+    r.onstop = function () { clearTimeout(to); finish(); };
+    try { if (r.requestData) r.requestData(); r.stop(); } catch (e) { clearTimeout(to); finish(); }
   }
 
   /* ---- REC orb ------------------------------------------------------------- */
-  function orbStand() {
+  function orbState() {
     if (!orb) return;
-    orb.setAttribute('data-an', recAn ? '1' : '0');
-    orb.style.background = recAn ? '#5a1010' : '#10141d';
-    orb.style.borderColor = recAn ? '#ff5f5f' : '#ffd23c';
-    orb.style.color = recAn ? '#ffb0b0' : '#ffd23c';
-    orb.title = recAn ? (DE ? 'Aufnahme läuft' : 'Recording') : (DE ? 'HISCORE aufnehmen' : 'Record HISCORE');
+    orb.setAttribute('data-on', recOn ? '1' : '0');
+    orb.style.background = recOn ? '#5a1010' : '#10141d';
+    orb.style.borderColor = recOn ? '#ff5f5f' : '#ffd23c';
+    orb.style.color = recOn ? '#ffb0b0' : '#ffd23c';
+    orb.title = recOn ? (DE ? 'Aufnahme läuft' : 'Recording') : (DE ? 'HISCORE aufnehmen' : 'Record HISCORE');
   }
 
-  function orbBau() {
+  function orbBuild() {
     if (orb) return;
     var arcade = !!document.getElementById('arcade-orb-btn');
     var wrap = document.createElement('div');
@@ -330,7 +330,7 @@
     orb.textContent = 'REC';
     orb.style.cssText = 'width:46px;height:46px;border-radius:50%;border:2px solid #ffd23c;background:#10141d;color:#ffd23c;font:700 11px Poppins,sans-serif;letter-spacing:.08em;cursor:pointer';
     orb.onclick = function () {
-      if (recAn) recStop(false);
+      if (recOn) recStop(false);
       else recStart();
     };
     menu = document.createElement('div');
@@ -343,7 +343,7 @@
     var camBox = menu.querySelector('.hs-cam');
     camBox.onchange = function () {
       wantCam = !!camBox.checked;
-      if (wantCam) camAn(function (ok) { if (!ok) { camBox.checked = false; wantCam = false; } });
+      if (wantCam) camOn(function (ok) { if (!ok) { camBox.checked = false; wantCam = false; } });
       else if (camStream) {
         try { camStream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
         camStream = null;
@@ -354,70 +354,70 @@
     wrap.onmouseenter = function () { menu.hidden = false; };
     wrap.onmouseleave = function () { menu.hidden = true; };
     document.body.appendChild(wrap);
-    orbStand();
+    orbState();
   }
 
   /* ---- Share card ---------------------------------------------------------- */
-  function xhrForm(url, fd, aufFortschritt, dann) {
+  function xhrForm(url, fd, onProgress, next) {
     var x = new XMLHttpRequest();
     x.open('POST', url);
     x.upload.onprogress = function (ev) {
-      if (!aufFortschritt) return;
+      if (!onProgress) return;
       if (ev.lengthComputable && ev.total > 0) {
-        aufFortschritt(Math.max(1, Math.min(99, Math.round(100 * ev.loaded / ev.total))));
-      } else aufFortschritt(null);
+        onProgress(Math.max(1, Math.min(99, Math.round(100 * ev.loaded / ev.total))));
+      } else onProgress(null);
     };
     x.onload = function () {
       var j = null;
       try { j = JSON.parse(x.responseText || '{}'); } catch (e) {}
       var ok = x.status >= 200 && x.status < 300 && !!(j && j.ok);
-      if (ok && aufFortschritt) aufFortschritt(100);
-      if (dann) dann(ok, j);
+      if (ok && onProgress) onProgress(100);
+      if (next) next(ok, j);
     };
-    x.onerror = function () { if (dann) dann(false); };
+    x.onerror = function () { if (next) next(false); };
     x.send(fd);
   }
 
-  function balkenZeig(root, pct, text) {
+  function barShow(root, pct, text) {
     var box = root.querySelector('.bar');
     if (!box) return;
-    box.classList.add('an');
-    box.classList.toggle('wart', pct == null);
-    var fuell = box.querySelector('.fuell');
+    box.classList.add('on');
+    box.classList.toggle('wait', pct == null);
+    var fill = box.querySelector('.fill');
     var lab = box.querySelector('.pct');
-    if (fuell && pct != null) fuell.style.width = pct + '%';
+    if (fill && pct != null) fill.style.width = pct + '%';
     if (lab) lab.textContent = text || (pct != null ? pct + '%' : '');
   }
 
-  function balkenText(pct, fertig, fehl) {
-    if (fehl) return DE ? 'Senden fehlgeschlagen' : 'Send failed';
-    if (fertig || pct === 100) return DE ? 'Oben. 100%' : 'Up. 100%';
+  function barText(pct, done, failed) {
+    if (failed) return DE ? 'Senden fehlgeschlagen' : 'Send failed';
+    if (done || pct === 100) return DE ? 'Oben. 100%' : 'Up. 100%';
     if (pct == null) return DE ? 'Lädt hoch…' : 'Uploading…';
     if (pct >= 99) return DE ? 'Speichere…' : 'Saving…';
     return (DE ? 'Lädt hoch… ' : 'Uploading… ') + pct + '%';
   }
 
-  function karte(d, score, name) {
+  function card(d, score, name) {
     try { if (hostCard && hostCard.isConnected) hostCard.remove(); } catch (e) {}
     var host = document.createElement('div');
     host.style.cssText = 'position:fixed;right:16px;bottom:16px;z-index:2147483646;';
     hostCard = host;
     var r = host.attachShadow({ mode: 'open' });
     var board = (d && d.share) || (BASE + '/board/' + encodeURIComponent((window.GS && GS.key) || KEY));
-    var rang = d && d.rank;
+    var rank = d && d.rank;
     var total = d && d.total;
-    var platz;
-    if (typeof rang === 'number' && rang > 0) {
-      var von = (typeof total === 'number' && total > 0)
+    var placeText;
+    if (typeof rank === 'number' && rank > 0) {
+      var ofTotal = (typeof total === 'number' && total > 0)
         ? (DE ? ' von ' + total : ' of ' + total) : '';
-      platz = (DE ? 'Platz <b>' + rang + '</b>' : 'Rank <b>' + rang + '</b>') + von;
+      placeText = (DE ? 'Platz <b>' + rank + '</b>' : 'Rank <b>' + rank + '</b>') + ofTotal;
     } else {
-      platz = DE ? 'Dein Lauf ist drin' : 'Your run is in';
+      placeText = DE ? 'Dein Lauf ist drin' : 'Your run is in';
     }
-    var t1 = (typeof rang === 'number' && rang > 0 && rang <= 3)
+    var t1 = (typeof rank === 'number' && rank > 0 && rank <= 3)
       ? (DE ? 'Dein Highscore steht in der Weltrangliste.' : 'Your highscore is on the world ranking.')
       : (DE ? 'Dein Lauf steht in der Weltrangliste.' : 'Your run is on the world ranking.');
-    var hat = !!(lastBlob && lastUrl);
+    var has = !!(lastBlob && lastUrl);
     r.innerHTML =
       '<style>' +
       ':host{all:initial}' +
@@ -425,8 +425,8 @@
       'color:#f4f1e6;border:2px solid #ffd23c;padding:16px;max-width:320px;border-radius:16px;position:relative}' +
       '.t{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#ffd23c;margin-bottom:8px}' +
       '.lead{font-size:13px;line-height:1.35;margin:0 0 10px;color:#c9b48a}' +
-      '.rang{font-size:16px;margin:0 0 4px;color:#ffe566;font-weight:600}' +
-      '.rang b{font-size:28px;font-weight:800}' +
+      '.rank{font-size:16px;margin:0 0 4px;color:#ffe566;font-weight:600}' +
+      '.rank b{font-size:28px;font-weight:800}' +
       '.gold{font-weight:800;font-style:italic;font-size:26px;margin:2px 0 0;color:#ffd23c}' +
       '.sc{font-family:"IBM Plex Mono",ui-monospace,monospace;font-style:normal;font-size:22px;margin:6px 0 10px}' +
       'video{width:100%;border-radius:10px;margin:8px 0;background:#000;max-height:140px}' +
@@ -436,30 +436,30 @@
       '.post{border:1px solid #ffd23c;background:transparent;color:#ffd23c}' +
       'a.see{border:0;background:#ffd23c;color:#1a1408}' +
       '.x{position:absolute;top:8px;right:10px;background:none;border:0;color:#8a7a58;font-size:18px;cursor:pointer}' +
-      '.hin{font-size:11px;color:#8a7a58;margin:0 0 8px}' +
+      '.hint{font-size:11px;color:#8a7a58;margin:0 0 8px}' +
       '.v{display:block;margin-top:10px;padding-top:8px;border-top:1px solid #3a3020;font-size:11px;color:#8a7a58}' +
       '.v button{background:none;border:0;padding:0;color:#ffd23c;font:inherit;text-decoration:underline;cursor:pointer}' +
       '.bar{display:none;margin:4px 0 10px}' +
-      '.bar.an{display:block}' +
-      '.bar .spur{height:8px;background:#2a1e08;border:1px solid #7a5a12;border-radius:999px;overflow:hidden}' +
-      '.bar .fuell{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffd23c,#fff3c4);' +
+      '.bar.on{display:block}' +
+      '.bar .track{height:8px;background:#2a1e08;border:1px solid #7a5a12;border-radius:999px;overflow:hidden}' +
+      '.bar .fill{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffd23c,#fff3c4);' +
       'border-radius:999px;transition:width .12s linear}' +
-      '.bar.wart .fuell{width:32%;animation:schub 1s ease-in-out infinite alternate}' +
-      '@keyframes schub{from{transform:translateX(-40%)}to{transform:translateX(220%)}}' +
-      '@media (prefers-reduced-motion:reduce){.bar .fuell{transition:none}.bar.wart .fuell{animation:none;width:50%}}' +
+      '.bar.wait .fill{width:32%;animation:sweep 1s ease-in-out infinite alternate}' +
+      '@keyframes sweep{from{transform:translateX(-40%)}to{transform:translateX(220%)}}' +
+      '@media (prefers-reduced-motion:reduce){.bar .fill{transition:none}.bar.wait .fill{animation:none;width:50%}}' +
       '.bar .pct{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#ffd23c;margin-top:5px}' +
       '</style>' +
       '<div class="k"><button class="x" type="button">&times;</button>' +
       '<div class="t">Games Are Eating The World</div>' +
       '<p class="lead">' + t1 + '</p>' +
-      '<div class="rang">' + platz + '</div>' +
+      '<div class="rank">' + placeText + '</div>' +
       '<div class="gold">' + esc(name || 'player') + '</div>' +
       (score != null ? '<div class="gold sc">' + esc(score) + '</div>' : '') +
-      (hat ? '<video muted playsinline controls src="' + lastUrl + '"></video>' +
-        '<p class="hin">' + (DE ? 'Der Score ist auf der Liste. Das Video geht nur, wenn du sendest.' : 'The score is on the list. The video goes only if you send it.') + '</p>' +
-        '<div class="bar"><div class="spur"><i class="fuell"></i></div><div class="pct"></div></div>' : '') +
-      '<button class="s" type="button">' + (hat ? (DE ? 'Video mit Freunden teilen' : 'Share video with friends') : (DE ? 'Mit Freunden teilen' : 'Share with friends')) + '</button>' +
-      (hat ? '<button class="post" type="button">' + (DE ? 'Video an die Weltrangliste senden' : 'Send video to the world ranking') + '</button>' : '') +
+      (has ? '<video muted playsinline controls src="' + lastUrl + '"></video>' +
+        '<p class="hint">' + (DE ? 'Der Score ist auf der Liste. Das Video geht nur, wenn du sendest.' : 'The score is on the list. The video goes only if you send it.') + '</p>' +
+        '<div class="bar"><div class="track"><i class="fill"></i></div><div class="pct"></div></div>' : '') +
+      '<button class="s" type="button">' + (has ? (DE ? 'Video mit Freunden teilen' : 'Share video with friends') : (DE ? 'Mit Freunden teilen' : 'Share with friends')) + '</button>' +
+      (has ? '<button class="post" type="button">' + (DE ? 'Video an die Weltrangliste senden' : 'Send video to the world ranking') + '</button>' : '') +
       '<a class="see" href="' + esc(board) + '" target="_blank" rel="noopener">' + (DE ? 'Weltrangliste öffnen' : 'Open the ranking') + '</a>' +
       ((window.GS && GS.connected && !GS.connected())
         ? '<span class="v">' + (DE ? 'Das zählt als Gast. ' : 'This counts as a guest run. ') +
@@ -470,18 +470,18 @@
     var vb = r.querySelector('.vb');
     if (vb) vb.onclick = function () { try { GS.connect(); } catch (e2) {} };
     var txt = (name || 'player') + (score != null ? ' · ' + score : '') +
-      (rang ? (DE ? ' · Platz ' : ' · Rank ') + rang +
+      (rank ? (DE ? ' · Platz ' : ' · Rank ') + rank +
         ((typeof total === 'number' && total > 0) ? (DE ? ' von ' : ' of ') + total : '') : '') +
       ' · Games Are Eating The World';
     r.querySelector('.s').onclick = function () {
       var payload = { title: 'HISCORE', text: txt, url: board };
-      if (hat && lastBlob && navigator.share) {
+      if (has && lastBlob && navigator.share) {
         var file;
         try { file = new File([lastBlob], 'hiscore.mp4', { type: lastBlob.type || 'video/mp4' }); } catch (e3) {}
-        var mit = file ? { title: payload.title, text: payload.text, url: payload.url, files: [file] } : payload;
-        var kann = true;
-        try { if (file && navigator.canShare) kann = navigator.canShare(mit); } catch (e4) { kann = false; }
-        navigator.share(kann && file ? mit : payload).then(function () {}, function () {
+        var withFile = file ? { title: payload.title, text: payload.text, url: payload.url, files: [file] } : payload;
+        var can = true;
+        try { if (file && navigator.canShare) can = navigator.canShare(withFile); } catch (e4) { can = false; }
+        navigator.share(can && file ? withFile : payload).then(function () {}, function () {
           window.open(board, '_blank');
         });
         return;
@@ -494,17 +494,17 @@
       if (!d || !d.id || !lastBlob) return;
       post.disabled = true;
       post.textContent = DE ? 'Sende…' : 'Sending…';
-      balkenZeig(r, 1, balkenText(1));
+      barShow(r, 1, barText(1));
       var fd = new FormData();
       fd.append('video', lastBlob, /mp4/i.test(lastBlob.type || '') ? 'run.mp4' : 'run.webm');
       fd.append('kind', 'clip');
       xhrForm(BASE + '/api/scores/' + d.id + '/proof', fd, function (pct) {
-        balkenZeig(r, pct, balkenText(pct));
+        barShow(r, pct, barText(pct));
       }, function (ok) {
         post.textContent = ok
           ? (DE ? 'Video ist auf der Liste' : 'Video is on the ranking')
           : (DE ? 'Senden fehlgeschlagen' : 'Send failed');
-        balkenZeig(r, ok ? 100 : 0, balkenText(ok ? 100 : 0, ok, !ok));
+        barShow(r, ok ? 100 : 0, barText(ok ? 100 : 0, ok, !ok));
         if (!ok) post.disabled = false;
       });
     };
@@ -522,7 +522,7 @@
         recStop(false, function () {
           orig.call(GS, score, Object.assign({}, opts, { show: false })).then(function (d) {
             var name = (opts && opts.player) || (window.GS && GS.player ? GS.player(false) : 'player');
-            if (d && d.ok && !d.flagged && show) karte(d, score, name);
+            if (d && d.ok && !d.flagged && show) card(d, score, name);
             resolve(d);
           }).catch(reject);
         });
@@ -538,7 +538,7 @@
 
   function kit() {
     wrapSubmit();
-    orbBau();
+    orbBuild();
     window.HISCORE = window.HISCORE || {};
     window.HISCORE.start = function () {
       try { if (window.GS && GS.reset) GS.reset(); } catch (e) {}
