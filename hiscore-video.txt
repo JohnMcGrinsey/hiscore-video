@@ -1,0 +1,99 @@
+HISCORE-VIDEO/1.4
+=================
+The optional video companion to the HISCORE protocol.
+This file is the specification of the package.
+
+Base protocol:      https://gamesareeatingtheworld.com/hiscore.txt
+This file:          https://gamesareeatingtheworld.com/hiscore-video.txt
+Browser kit:        https://gamesareeatingtheworld.com/hiscore.js
+Public history:     https://github.com/JohnMcGrinsey/hiscore-video
+
+HISCORE-VIDEO is a PACKAGE, not the protocol. It attaches a recording
+of a run to a score, so a record carries its own footage.
+
+HISCORE-VIDEO requires HISCORE. HISCORE does not require HISCORE-VIDEO.
+
+Read this first:
+  - A game on pure HISCORE/1.4 is complete. This package adds to it.
+    It never becomes a requirement.
+  - A score without a clip is always valid. Never require a clip.
+  - Every registry field this package adds is optional. A registry
+    that does not implement this package ignores the fields (unknown
+    fields are ignored, not rejected).
+  - Versions move in lockstep with the protocol. HISCORE-VIDEO/1.4
+    pairs with HISCORE/1.4. There is no mixed pairing.
+
+Implement it one of two ways: the kit (one script line, records and
+uploads for you) or plain HTTP (record however you want, upload the
+file yourself). The HTTP way needs no code from us.
+
+
+FIELDS (added to the score record of HISCORE/1.4)
+  proof_url    optional  string   https URL of a recording of this run
+  proof_sha256 optional  string   64 hex chars, sha256 of that file
+  proof_kind   optional  enum     clip | replay     default clip
+
+  Send them on POST /api/scores when the recording already has a
+  public URL of its own. Or attach the file afterwards (below) and
+  the registry sets all three.
+
+  clip is a video file of the run. replay is reserved: an input-log
+  replay format is not specified yet. Do not invent one.
+
+
+ATTACH A CLIP (after the score exists)
+  POST https://gamesareeatingtheworld.com/api/scores/<id>/proof
+  multipart/form-data, field "video" (also accepted: "file", "proof").
+  Optional field "kind" = clip | replay.
+  <id> is the "id" from the score response.
+
+  200 {"ok":true,"id":4711,
+       "proof_url":"https://gamesareeatingtheworld.com/proof/4711",
+       "proof_sha256":"...","proof_kind":"clip"}
+  400 video       no usable file in the request
+  404 unknown_score
+  413 too_large   the reference registry caps the upload at 32 MB
+
+  CORS is open. No account. Guest scores may carry a clip.
+  mp4 and webm are stored as sent. Anything else is treated as webm.
+
+
+THE KIT (hiscore.js)
+  <script src="https://gamesareeatingtheworld.com/hiscore.js"
+          data-key="YOUR_ID" data-version="1.4.0"></script>
+
+  The kit bundles the whole HISCORE protocol client (same GS.* calls
+  as gs.js) plus the recorder and a share card. Do not load gs.js and
+  hiscore.js together.
+
+  HISCORE.start()          call when a run begins: starts recording
+                           the game canvas (2D and WebGL), game audio
+                           included where the browser allows it
+  GS.submit(score)         call when the run ends: submits the score,
+                           stops the tape, shows the share card
+  GS.submit(score, { show: false })   for automatic submits
+
+  The card shows rank and score, plays back the clip, and offers two
+  explicit buttons: share the video with friends, send the video to
+  the world ranking. NOTHING UPLOADS WITHOUT THAT CLICK. The score
+  itself is already on the board either way.
+
+  Recording is local until the player sends it. The optional camera
+  overlay asks for permission through the browser and stays off by
+  default. Failure to record must never break the game or the score.
+
+
+WHY THIS IS A SEPARATE PACKAGE
+  Pure HISCORE/1.4 is implementable with zero third-party code, and
+  some projects want exactly that: no foreign script inside the game,
+  nothing that touches canvas, audio, or camera. Splitting the tape
+  out keeps that promise clean. A game adds this package only when it
+  wants footage, and can drop it again without touching its scores.
+
+
+STATUS
+  HISCORE-VIDEO is an optional companion package to HISCORE.
+  Introduced as part of HISCORE/1.3 (2026-08-20), split into this
+  separate package in 1.4. This revision 2026-08-24 (1.4).
+  Licence: CC BY 4.0.
+  Contact: john@mcgrinsey.com
