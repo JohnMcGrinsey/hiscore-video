@@ -1,0 +1,5 @@
+# HISCORE-VIDEO/1.4 package repository. Ignore OS and editor litter only.
+.DS_Store
+*.log
+.idea/
+.vscode/
